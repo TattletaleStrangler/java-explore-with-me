@@ -21,7 +21,7 @@ public class StatsClient {
     @Value("${stats-server.url}")
     private String serverUrl;
 
-    private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public StatsClient() {
         rest = new RestTemplate();
@@ -38,8 +38,8 @@ public class StatsClient {
     ResponseEntity<Object> getStatistics(LocalDateTime start, LocalDateTime end, Boolean unique, List<String> uris) {
 
         Map<String, Object> parameters = Map.of(
-                "start", dtf.format(start),
-                "end", dtf.format(end),
+                "start", DTF.format(start),
+                "end", DTF.format(end),
                 "unique", unique,
                 "uris", uris
         );

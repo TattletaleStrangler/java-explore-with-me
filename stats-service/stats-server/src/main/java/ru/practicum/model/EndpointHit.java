@@ -21,8 +21,9 @@ public class EndpointHit {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "app", length = 255, nullable = false)
-    private String app;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "app_id")
+    private App app;
 
     @Column(name = "uri", length = 512, nullable = false)
     private String uri;

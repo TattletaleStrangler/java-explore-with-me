@@ -6,9 +6,9 @@ import ru.practicum.dto.EndpointHitDto;
 @UtilityClass
 public class EndpointHitMapper {
 
-    public EndpointHit dtoToEndpointHit(EndpointHitDto dto) {
+    public EndpointHit dtoToEndpointHit(EndpointHitDto dto, App app) {
         return EndpointHit.builder()
-                .app(dto.getApp())
+                .app(app)
                 .ip(dto.getIp())
                 .uri(dto.getUri())
                 .timestamp(dto.getTimestamp())
@@ -16,13 +16,13 @@ public class EndpointHitMapper {
     }
 
     public EndpointHitDto endpointHitToDto(EndpointHit endpointHit) {
-        EndpointHitDto endpointHitDto = new EndpointHitDto();
-        endpointHitDto.setId(endpointHit.getId());
-        endpointHitDto.setApp(endpointHit.getApp());
-        endpointHitDto.setIp(endpointHit.getIp());
-        endpointHitDto.setUri(endpointHit.getUri());
-        endpointHitDto.setTimestamp(endpointHit.getTimestamp());
-        return endpointHitDto;
+        return EndpointHitDto.builder()
+                .id(endpointHit.getId())
+                .app(endpointHit.getApp().getName())
+                .ip(endpointHit.getIp())
+                .uri(endpointHit.getUri())
+                .timestamp(endpointHit.getTimestamp())
+                .build();
     }
 
 }
