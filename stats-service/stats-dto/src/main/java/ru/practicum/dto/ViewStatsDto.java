@@ -2,9 +2,11 @@ package ru.practicum.dto;
 
 import lombok.*;
 
-@Data
+@Getter
+@Setter
 @Builder
 @AllArgsConstructor
+@NoArgsConstructor
 public class ViewStatsDto {
     private String app;
     private String uri;

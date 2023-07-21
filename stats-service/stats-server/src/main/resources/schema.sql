@@ -17,5 +17,3 @@ CREATE TABLE IF NOT EXISTS endpointhit (
     CONSTRAINT pk_hit PRIMARY KEY (id),
     CONSTRAINT fk_hit_to_app FOREIGN KEY (app_id) REFERENCES app(id)
 );
-
-SELECT * FROM endpointhit;

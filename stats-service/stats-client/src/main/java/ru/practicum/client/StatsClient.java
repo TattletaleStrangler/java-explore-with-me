@@ -6,15 +6,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.dto.EndpointHitDto;
+import ru.practicum.dto.ViewStatsDto;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
+@Component
 public class StatsClient {
     private final RestTemplate rest;
 
@@ -31,11 +36,12 @@ public class StatsClient {
         rest.setRequestFactory(factory);
     }
 
-    ResponseEntity<Object> createEndpointHit(EndpointHitDto endpointHitDto) {
-        return makeAndSendRequest(HttpMethod.POST, "/hit", null, endpointHitDto);
+    public EndpointHitDto createEndpointHit(EndpointHitDto endpointHitDto) {
+        EndpointHitDto savedEndpointHit = rest.postForEntity(serverUrl + "/hit", endpointHitDto, EndpointHitDto.class).getBody();
+        return savedEndpointHit;
     }
 
-    ResponseEntity<Object> getStatistics(LocalDateTime start, LocalDateTime end, Boolean unique, List<String> uris) {
+    public List<ViewStatsDto> getStatistics(LocalDateTime start, LocalDateTime end, Boolean unique, List<String> uris) {
 
         Map<String, Object> parameters = Map.of(
                 "start", DTF.format(start),
@@ -44,7 +50,21 @@ public class StatsClient {
                 "uris", uris
         );
 
-        return makeAndSendRequest(HttpMethod.GET, "/stats", parameters, null);
+        String uri = serverUrl + "/stats";
+        String url = UriComponentsBuilder.fromHttpUrl(uri)
+                .queryParam("start", "{start}")
+                .queryParam("end", "{end}")
+                .queryParam("unique", "{unique}")
+                .queryParam("uris", uris)
+                .encode().toUriString();
+
+        try {
+            ResponseEntity<ViewStatsDto[]> views = rest.getForEntity(url, ViewStatsDto[].class, parameters);
+            List<ViewStatsDto> viewList = List.of(Objects.requireNonNull(views.getBody()));
+            return viewList;
+        } catch (HttpStatusCodeException e) {
+            return List.of();
+        }
     }
 
     private <T> ResponseEntity<Object> makeAndSendRequest(HttpMethod method, String path, @Nullable Map<String, Object> parameters, @Nullable T body) {
