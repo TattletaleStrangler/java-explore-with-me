@@ -173,8 +173,6 @@ public class EventService {
         Sort sort = Sort.by(Sort.Direction.DESC, "eventDate");
         PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size, sort);
         Iterable<Event> events = eventStorage.findAll(predicate, page);
-        List <Event> eventList1 = eventStorage.findAll();
-
         List<Event> eventList = new ArrayList<>();
         events.forEach(eventList::add);
 

@@ -25,4 +25,5 @@ public interface RequestStorage extends JpaRepository<ParticipationRequest, Long
             "WHERE request.status = :status AND request.event IN :events " +
             "GROUP BY request.event.id ")
     List<ConfirmedRequests> getConfirmedRequestsByEventAndStatus(@Param("events") List<Event> events, @Param("status") ParticipationRequest.Status status);
+
 }
