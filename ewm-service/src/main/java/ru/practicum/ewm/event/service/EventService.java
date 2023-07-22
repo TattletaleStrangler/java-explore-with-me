@@ -453,7 +453,7 @@ public class EventService {
         if (newDto.getRequestModeration() != null) {
             event.setRequestModeration(newDto.getRequestModeration());
         }
-        if (newDto.getCategoryId() != null && newDto.getCategoryId() != event.getCategory().getId()) {
+        if (newDto.getCategoryId() != null && !Objects.equals(newDto.getCategoryId(), event.getCategory().getId())) {
             Category newCategory = checkCategoryAndGet(newDto.getCategoryId());
             event.setCategory(newCategory);
         }
