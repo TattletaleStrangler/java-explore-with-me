@@ -16,14 +16,11 @@ public interface RequestStorage extends JpaRepository<ParticipationRequest, Long
 
     List<ParticipationRequest> findAllByEventId(long eventId);
 
-    List<ParticipationRequest> findAllByStatusAndEventIdAndIdIn(ParticipationRequest.Status status,
-                                                                  Long eventId, List<Long> requestIds);
-
     List<ParticipationRequest> findAllByEventIdAndIdIn(Long eventId, List<Long> requestIds);
 
     @Query("SELECT new ru.practicum.ewm.event.dto.ConfirmedRequests(request.event.id, COUNT(request.event.id)) FROM ParticipationRequest AS request " +
             "WHERE request.status = :status AND request.event IN :events " +
             "GROUP BY request.event.id ")
-    List<ConfirmedRequests> getConfirmedRequestsByEventAndStatus(@Param("events") List<Event> events, @Param("status") ParticipationRequest.Status status);
+    List<ConfirmedRequests> getRequestsByEventAndStatus(@Param("events") List<Event> events, @Param("status") ParticipationRequest.Status status);
 
 }

@@ -61,51 +61,24 @@ public class EventService {
     //**
     public List<EventFullDto> getEvents(EventParams params) {
         checkParams(params);
-        Predicate predicate = createPredicate(params);
-        int from = params.getFrom();
-        int size = params.getSize();
-        Sort sort = Sort.by(Sort.Direction.ASC, "eventDate");
-
-        PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size, sort);
-        Iterable<Event> events = eventStorage.findAll(predicate, page);
-        List<Event> eventList = new ArrayList<>();
-        events.forEach(eventList::add);
-
-        List<ConfirmedRequests> confirmedRequests = requestStorage.getConfirmedRequestsByEventAndStatus(eventList, ParticipationRequest.Status.CONFIRMED);
-        Map<Long, ConfirmedRequests> groupedConfirmedRequests = confirmedRequests.stream()
-                .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
-
+        List<Event> events = findEvents(params);
+        Map<Long, ConfirmedRequests> groupedConfirmedRequests = getConfirmedRequests(events);
         Map<Long, String> uris = new HashMap<>();
+        Map<String, ViewStatsDto> groupedViews = getStatistics(events, uris, false);
 
-        for (Event event : eventList) {
-            URIBuilder uriBuilder = new URIBuilder()
-                    .setPath(BASE_URI)
-                    .setPath(String.valueOf(event.getId()));
-            uris.put(event.getId(), uriBuilder.toString());
-        }
-
-        List<ViewStatsDto> viewStats = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, new ArrayList<>(uris.values()));
-
-        Map<String, ViewStatsDto> groupedViews = viewStats.stream()
-                .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
-
-        List<EventFullDto> eventFullDtos = new ArrayList<>();
-        for (Event event : eventList) {
-            CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory()); //todo хранить категории чтобы много раз одни и те же не маппить
-            UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
-            LocationDto locationDto = LocationMapper.locationToDto(event.getLocation());
+        List<EventFullDto> eventFullDtoList = new ArrayList<>();
+        for (Event event : events) {
             ViewStatsDto viewStatsDto = groupedViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
             ConfirmedRequests confirmedRequestsForEvent = groupedConfirmedRequests.get(event.getId());
             long numConfirmedRequests = confirmedRequestsForEvent == null ? 0 : confirmedRequestsForEvent.getConfirmedRequests();
-            EventFullDto dto = EventMapper.eventToFullDto(event, initiatorDto, categoryDto, locationDto,
-                    viewStatsDto.getHits(), numConfirmedRequests);
-            eventFullDtos.add(dto);
+            EventDtoParams eventDtoParams = createEventDtoParams(event, viewStatsDto.getHits(), numConfirmedRequests);
+            EventFullDto dto = EventMapper.eventToFullDto(eventDtoParams);
+            eventFullDtoList.add(dto);
         }
         if (EventParams.Sort.VIEWS.equals(params.getSort())) {
-            eventFullDtos.sort(Comparator.comparing(EventFullDto::getViews));
+            eventFullDtoList.sort(Comparator.comparing(EventFullDto::getViews));
         }
-        return eventFullDtos;
+        return eventFullDtoList;
     }
 
     //**
@@ -140,19 +113,10 @@ public class EventService {
 
         Event newEvent = eventStorage.save(oldEvent);
 
-        Long confirmedRequests = requestStorage.countAllByEventIdAndStatus(eventId, ParticipationRequest.Status.CONFIRMED);
-
-        List<ViewStatsDto> view = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, List.of(BASE_URI + "/" + newEvent.getId()));
-        long hits = 0L;
-        if (view != null && view.size() > 0) {
-            hits = view.get(0).getHits();
-        }
-        CategoryDto categoryDto = CategoryMapper.categoryToDto(newEvent.getCategory());
-        LocationDto locationDto = LocationMapper.locationToDto(newEvent.getLocation());
-        UserShortDto initiatorDto = UserMapper.userToShortDto(newEvent.getInitiator());
-        EventFullDto eventFullDto = EventMapper.eventToFullDto(newEvent, initiatorDto, categoryDto, locationDto, hits, confirmedRequests);
-        return eventFullDto;
+        long confirmedRequests = requestStorage.countAllByEventIdAndStatus(eventId, ParticipationRequest.Status.CONFIRMED);
+        long views = getHitsForEvent(newEvent.getId(), false);
+        EventDtoParams eventDtoParams = createEventDtoParams(newEvent, views, confirmedRequests);
+        return EventMapper.eventToFullDto(eventDtoParams);
     }
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -165,45 +129,19 @@ public class EventService {
     //* информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики
     //**
     public List<EventShortDto> getShortEvents(EventParams params) {
-//        params.setStates(List.of(Event.State.PUBLISHED));
         checkParams(params);
-        Predicate predicate = createPredicate(params);
-        int from = params.getFrom();
-        int size = params.getSize();
-        Sort sort = Sort.by(Sort.Direction.DESC, "eventDate");
-        PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size, sort);
-        Iterable<Event> events = eventStorage.findAll(predicate, page);
-        List<Event> eventList = new ArrayList<>();
-        events.forEach(eventList::add);
-
-        List<ConfirmedRequests> confirmedRequests = requestStorage.getConfirmedRequestsByEventAndStatus(eventList, ParticipationRequest.Status.CONFIRMED);
-        Map<Long, ConfirmedRequests> groupedConfirmedRequests = confirmedRequests.stream()
-                .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
-
+        List<Event> events = findEvents(params);
+        Map<Long, ConfirmedRequests> groupedConfirmedRequests = getConfirmedRequests(events);
         Map<Long, String> uris = new HashMap<>();
-
-        for (Event event : eventList) {
-            URIBuilder uriBuilder = new URIBuilder()
-                    .setPath(BASE_URI)
-                    .setPath(String.valueOf(event.getId()));
-            uris.put(event.getId(), uriBuilder.toString());
-        }
-
-        List<ViewStatsDto> viewStats = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, new ArrayList<>(uris.values()));
-
-        Map<String, ViewStatsDto> sortViews = viewStats.stream()
-                .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
+        Map<String, ViewStatsDto> groupedViews = getStatistics(events, uris, true);
 
         List<EventShortDto> eventShortDtoList = new ArrayList<>();
-        for (Event event : eventList) {
-            CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
-            UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
-            ViewStatsDto viewStatsDto = sortViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
+        for (Event event : events) {
+            ViewStatsDto viewStatsDto = groupedViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
             ConfirmedRequests confirmedRequestsForEvent = groupedConfirmedRequests.get(event.getId());
             long numConfirmedRequests = confirmedRequestsForEvent == null ? 0 : confirmedRequestsForEvent.getConfirmedRequests();
-            EventShortDto dto = EventMapper.eventToShortDto(event, initiatorDto, categoryDto, viewStatsDto.getHits(),
-                    numConfirmedRequests);
+            EventDtoParams eventDtoParams = createEventDtoParams(event, viewStatsDto.getHits(), numConfirmedRequests);
+            EventShortDto dto = EventMapper.eventToShortDto(eventDtoParams);
             eventShortDtoList.add(dto);
         }
         if (EventParams.Sort.VIEWS.equals(params.getSort())) {
@@ -224,18 +162,11 @@ public class EventService {
             throw new EventNotFountException("An unregistered user can view only published events.");
         }
 
-        List<ViewStatsDto> view = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                true, List.of(BASE_URI + "/" + event.getId()));
-        long hit = 0L;
-        if (view != null && view.size() > 0) {
-            hit = view.get(0).getHits();
-        }
+        long views = getHitsForEvent(eventId, true);
 
         long confirmedRequests = requestStorage.countAllByEventIdAndStatus(eventId, ParticipationRequest.Status.CONFIRMED);
-        UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
-        CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
-        LocationDto locationDto = LocationMapper.locationToDto(event.getLocation());
-        return EventMapper.eventToFullDto(event, initiatorDto, categoryDto, locationDto, hit, confirmedRequests);
+        EventDtoParams eventDtoParams = createEventDtoParams(event, views, confirmedRequests);
+        return EventMapper.eventToFullDto(eventDtoParams);
     }
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -252,12 +183,10 @@ public class EventService {
         event.setState(Event.State.PENDING);
         Event savedEvent = eventStorage.save(event);
 
-        UserShortDto userShortDto = UserMapper.userToShortDto(initiator);
-        CategoryDto categoryDto = CategoryMapper.categoryToDto(category);
-        LocationDto locationDto = LocationMapper.locationToDto(location);
         long initConfirmedRequests = 0L;
         long initViews = 0L;
-        return EventMapper.eventToFullDto(savedEvent, userShortDto, categoryDto, locationDto, initViews, initConfirmedRequests);
+        EventDtoParams eventDtoParams = createEventDtoParams(savedEvent, initViews, initConfirmedRequests);
+        return EventMapper.eventToFullDto(eventDtoParams);
     }
 
     //**
@@ -265,38 +194,22 @@ public class EventService {
     //**
     public List<EventShortDto> getEvents(Long userId, int from, int size) {
         User initiator = checkUserAndGet(userId);
-        UserShortDto initiatorDto = UserMapper.userToShortDto(initiator);
+        UserMapper.userToShortDto(initiator);
 
         PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size, Sort.by("id"));
         List<Event> events = eventStorage.findAllByInitiatorId(userId, page);
 
-        List<ConfirmedRequests> confirmedRequests = requestStorage.getConfirmedRequestsByEventAndStatus(events, ParticipationRequest.Status.CONFIRMED);
-        Map<Long, ConfirmedRequests> groupedConfirmedRequests = confirmedRequests.stream()
-                .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
-
+        Map<Long, ConfirmedRequests> groupedConfirmedRequests = getConfirmedRequests(events);
         Map<Long, String> uris = new HashMap<>();
-
-        for (Event event : events) {
-            URIBuilder uriBuilder = new URIBuilder()
-                    .setPath(BASE_URI)
-                    .setPath(String.valueOf(event.getId()));
-            uris.put(event.getId(), uriBuilder.toString());
-        }
-
-        List<ViewStatsDto> viewStats = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, new ArrayList<>(uris.values()));
-
-        Map<String, ViewStatsDto> sortViews = viewStats.stream()
-                .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
+        Map<String, ViewStatsDto> groupedViews = getStatistics(events, uris, false);
 
         List<EventShortDto> eventShortDtoList = new ArrayList<>();
         for (Event event : events) {
-            CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
-            ViewStatsDto viewStatsDto = sortViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
+            ViewStatsDto viewStatsDto = groupedViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
             ConfirmedRequests confirmedRequestsForEvent = groupedConfirmedRequests.get(event.getId());
             long numConfirmedRequests = confirmedRequestsForEvent == null ? 0 : confirmedRequestsForEvent.getConfirmedRequests();
-            EventShortDto dto = EventMapper.eventToShortDto(event, initiatorDto, categoryDto, viewStatsDto.getHits(),
-                    numConfirmedRequests);
+            EventDtoParams eventDtoParams = createEventDtoParams(event, viewStatsDto.getHits(), numConfirmedRequests);
+            EventShortDto dto = EventMapper.eventToShortDto(eventDtoParams);
             eventShortDtoList.add(dto);
         }
 
@@ -308,20 +221,14 @@ public class EventService {
     //**
     public EventFullDto getEvent(Long userId, Long eventId) {
         User initiator = checkUserAndGet(userId);
-        UserShortDto initiatorDto = UserMapper.userToShortDto(initiator);
+        UserMapper.userToShortDto(initiator);
 
         Event event = checkEventAndGet(eventId);
-        List<ViewStatsDto> view = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, List.of(BASE_URI + "/" + event.getId()));
-        long hit = 0L;
-        if (view != null && view.size() > 0) {
-            hit = view.get(0).getHits();
-        }
+        long views = getHitsForEvent(eventId, false);
 
         long confirmedRequests = requestStorage.countAllByEventIdAndStatus(eventId, ParticipationRequest.Status.CONFIRMED);
-        CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
-        LocationDto locationDto = LocationMapper.locationToDto(event.getLocation());
-        return EventMapper.eventToFullDto(event, initiatorDto, categoryDto, locationDto, hit, confirmedRequests);
+        EventDtoParams eventDtoParams = createEventDtoParams(event, views, confirmedRequests);
+        return EventMapper.eventToFullDto(eventDtoParams);
     }
 
     //**
@@ -331,7 +238,7 @@ public class EventService {
     //**
     public EventFullDto updateEvent(UpdateEventUserRequest eventDto, Long userId, Long eventId) {
         User initiator = checkUserAndGet(userId);
-        UserShortDto initiatorDto = UserMapper.userToShortDto(initiator);
+        UserMapper.userToShortDto(initiator);
         Event oldEvent = checkEventAndGet(eventId);
 
         if (oldEvent.getState().equals(Event.State.PUBLISHED)) {
@@ -351,18 +258,11 @@ public class EventService {
         }
 
         Event newEvent = eventStorage.save(oldEvent);
-
-        List<ViewStatsDto> view = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, List.of(BASE_URI + "/" + newEvent.getId()));
-        long hits = 0L;
-        if (view != null && view.size() > 0) {
-            hits = view.get(0).getHits();
-        }
-
+        long views = getHitsForEvent(newEvent.getId(), false);
         long confirmedRequests = requestStorage.countAllByEventIdAndStatus(eventId, ParticipationRequest.Status.CONFIRMED);
-        CategoryDto categoryDto = CategoryMapper.categoryToDto(newEvent.getCategory());
-        LocationDto locationDto = LocationMapper.locationToDto(newEvent.getLocation());
-        EventFullDto eventFullDto = EventMapper.eventToFullDto(newEvent, initiatorDto, categoryDto, locationDto, hits, confirmedRequests);
+
+        EventDtoParams eventDtoParams = createEventDtoParams(newEvent, views, confirmedRequests);
+        EventFullDto eventFullDto = EventMapper.eventToFullDto(eventDtoParams);
         return eventFullDto;
     }
 
@@ -433,6 +333,53 @@ public class EventService {
                 .build();
     }
 
+    private EventDtoParams createEventDtoParams(Event event, long views, long confirmedRequests) {
+        UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
+        CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
+        LocationDto locationDto = LocationMapper.locationToDto(event.getLocation());
+        return EventDtoParams.builder()
+                .event(event)
+                .initiator(initiatorDto)
+                .category(categoryDto)
+                .location(locationDto)
+                .views(views)
+                .confirmedRequests(confirmedRequests)
+                .build();
+    }
+
+    private List<Event> findEvents(EventParams params) {
+        Predicate predicate = createPredicate(params);
+        int from = params.getFrom();
+        int size = params.getSize();
+        Sort sort = Sort.by(Sort.Direction.ASC, "eventDate");
+        PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size, sort);
+        Iterable<Event> events = eventStorage.findAll(predicate, page);
+        List<Event> eventList = new ArrayList<>();
+        events.forEach(eventList::add);
+        return eventList;
+    }
+
+    private Map<Long, ConfirmedRequests> getConfirmedRequests(List<Event> events) {
+        List<ConfirmedRequests> confirmedRequests = requestStorage.getRequestsByEventAndStatus(events, ParticipationRequest.Status.CONFIRMED);
+        return confirmedRequests.stream()
+                .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
+    }
+
+    private Map<String, ViewStatsDto> getStatistics(List<Event> events, Map<Long, String> uris, Boolean unique) {
+        for (Event event : events) {
+            URIBuilder uriBuilder = new URIBuilder()
+                    .setPath(BASE_URI)
+                    .setPath(String.valueOf(event.getId()));
+            uris.put(event.getId(), uriBuilder.toString());
+        }
+
+        List<ViewStatsDto> viewStats = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
+                unique, new ArrayList<>(uris.values()));
+
+        return viewStats.stream()
+                .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
+    }
+
     private Predicate createPredicate(EventParams params) {
         QEvent event = QEvent.event;
         QParticipationRequest request = QParticipationRequest.participationRequest;
@@ -441,8 +388,7 @@ public class EventService {
             params.setOnlyAvailable(null);
         }
 
-        Predicate result =
-        PredicateBuilder.builder()
+        return PredicateBuilder.builder()
                 .add(params.getText(), List.of(event.annotation::containsIgnoreCase,
                         event.description::containsIgnoreCase))
                 .addPredicates(params.getOnlyAvailable(),
@@ -460,8 +406,6 @@ public class EventService {
                 .add(params.getRangeStart(), event.eventDate::goe)
                 .add(params.getRangeEnd(), event.eventDate::loe)
                 .buildAnd();
-
-        return result;
     }
 
     private User checkUserAndGet(long userId) {
@@ -542,6 +486,16 @@ public class EventService {
         if (params.getRangeStart() == null && params.getRangeEnd() == null) {
             params.setRangeStart(LocalDateTime.now());
         }
+    }
+
+    private long getHitsForEvent(long eventId, boolean unique) {
+        List<ViewStatsDto> view = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
+                unique, List.of(BASE_URI + "/" + eventId));
+        long hits = 0L;
+        if (view != null && view.size() > 0) {
+            hits = view.get(0).getHits();
+        }
+        return hits;
     }
 
 }

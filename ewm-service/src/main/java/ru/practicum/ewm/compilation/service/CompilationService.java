@@ -12,9 +12,7 @@ import ru.practicum.ewm.compilation.dto.CompilationDto;
 import ru.practicum.ewm.compilation.dto.NewCompilationDto;
 import ru.practicum.ewm.compilation.model.Compilation;
 import ru.practicum.ewm.compilation.storage.CompilationStorage;
-import ru.practicum.ewm.event.dto.ConfirmedRequests;
-import ru.practicum.ewm.event.dto.EventMapper;
-import ru.practicum.ewm.event.dto.EventShortDto;
+import ru.practicum.ewm.event.dto.*;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.storage.EventStorage;
 import ru.practicum.ewm.exception.CompilationNotFoundException;
@@ -49,8 +47,7 @@ public class CompilationService {
     }
 
     public CompilationDto updateCompilation(NewCompilationDto compilationDto, Long compId) {
-        Compilation oldCompilation = compilationStorage.findById(compId)
-                .orElseThrow(() -> new CompilationNotFoundException("Compilation with id=" + compId + " was not found"));
+        Compilation oldCompilation = checkCompilationAndGet(compId);
 
         updateCompilation(oldCompilation, compilationDto);
         Compilation updatedCompilation = compilationStorage.save(oldCompilation);
@@ -72,8 +69,7 @@ public class CompilationService {
     }
 
     public CompilationDto getCompilation(Long compId) {
-        Compilation compilation = compilationStorage.findById(compId)
-                .orElseThrow(() -> new CompilationNotFoundException("Compilation with id=" + compId + " was not found"));
+        Compilation compilation = checkCompilationAndGet(compId);
 
         CompilationDto compilationDto = compilationToDto(compilation);
         return compilationDto;
@@ -91,6 +87,11 @@ public class CompilationService {
                 .pinned(dto.getPinned())
                 .events(eventSet)
                 .build();
+    }
+
+    private Compilation checkCompilationAndGet(Long compId) {
+        return compilationStorage.findById(compId)
+                .orElseThrow(() -> new CompilationNotFoundException("Compilation with id=" + compId + " was not found"));
     }
 
     private void updateCompilation(Compilation oldCompilation, NewCompilationDto dto) {
@@ -116,7 +117,7 @@ public class CompilationService {
 
         Set<Event> events = compilation.getEvents();
         List<Event> eventList = new ArrayList<>(events);
-        List<ConfirmedRequests> confirmedRequests = requestStorage.getConfirmedRequestsByEventAndStatus(eventList, ParticipationRequest.Status.CONFIRMED);
+        List<ConfirmedRequests> confirmedRequests = requestStorage.getRequestsByEventAndStatus(eventList, ParticipationRequest.Status.CONFIRMED);
         Map<Long, ConfirmedRequests> groupedConfirmedRequests = confirmedRequests.stream()
                 .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
 
@@ -135,13 +136,11 @@ public class CompilationService {
         Map<String, ViewStatsDto> sortViews = viewStats.stream()
                 .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
         for (Event event : events) {
-            CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
-            UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
             ViewStatsDto viewStatsDto = sortViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
             ConfirmedRequests confirmedRequestsForEvent = groupedConfirmedRequests.get(event.getId());
             long numConfirmedRequests = confirmedRequestsForEvent == null ? 0 : confirmedRequestsForEvent.getConfirmedRequests();
-            EventShortDto dto = EventMapper.eventToShortDto(event, initiatorDto, categoryDto, viewStatsDto.getHits(),
-                    numConfirmedRequests);
+            EventDtoParams eventDtoParams = createEventDtoParams(event, viewStatsDto.getHits(), numConfirmedRequests);
+            EventShortDto dto = EventMapper.eventToShortDto(eventDtoParams);
             eventShortDtoList.add(dto);
         }
 
@@ -150,6 +149,20 @@ public class CompilationService {
                 .title(compilation.getTitle())
                 .pinned(compilation.getPinned())
                 .events(eventShortDtoList)
+                .build();
+    }
+
+    private EventDtoParams createEventDtoParams(Event event, long hits, long confirmedRequests) {
+        UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
+        CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
+        LocationDto locationDto = LocationMapper.locationToDto(event.getLocation());
+        return EventDtoParams.builder()
+                .event(event)
+                .initiator(initiatorDto)
+                .category(categoryDto)
+                .location(locationDto)
+                .views(hits)
+                .confirmedRequests(confirmedRequests)
                 .build();
     }
 

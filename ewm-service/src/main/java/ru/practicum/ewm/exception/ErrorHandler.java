@@ -46,21 +46,6 @@ public class ErrorHandler {
                 .timestamp(String.valueOf(LocalDateTime.now()))
                 .build();
     }
-//
-//    @ExceptionHandler
-//    @ResponseStatus(HttpStatus.FORBIDDEN)
-//    public ErrorApi handleNotEnoughRightsException(final NotEnoughRightsException e) {
-//        log.info("Получен статус 403 Forbidden {}", e.getMessage(), e);
-//        return new ErrorApi(e.getMessage());
-//    }
-//
-//    @ExceptionHandler(ConstraintViolationException.class)
-//    @ResponseStatus(HttpStatus.CONFLICT)
-//    public ErrorApi handleBadRequestConflictException(final ConstraintViolationException e) {
-//        log.info("409 CONFLICT {}", e.getMessage());
-//        return new ErrorApi(HttpStatus.CONFLICT, "Integrity constraint has been violated.", e.getMessage(), Collections.emptyList());
-//    }
-
 
     //**
     //* MethodArgumentNotValidException валидация полей с помощью аннотаций
@@ -68,7 +53,7 @@ public class ErrorHandler {
     //**
     @ExceptionHandler({MethodArgumentNotValidException.class, ValidationException.class,
             MethodArgumentTypeMismatchException.class, NumberFormatException.class,
-            MissingServletRequestParameterException.class}) //{ValidationException.class, ,IllegalArgumentException.class}
+            MissingServletRequestParameterException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorApi handleBadRequestException(final Exception e) {
         log.info("400 Bad Request {}", e.getMessage());

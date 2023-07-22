@@ -20,6 +20,7 @@ import java.util.List;
 @RequestMapping(path = "/events")
 public class PublicEventController {
 
+    private static final String APP = "explore-with-me";
     private final EventService eventService;
     private final StatsClient statsClient;
 
@@ -36,17 +37,6 @@ public class PublicEventController {
                                          HttpServletRequest request) {
         log.info("GET /events text={},paid={},onlyAvailable={},categories={},rangeStart={},rangeEnd={},sort={},from={},size={}",
                 text, paid, onlyAvailable, categories, rangeStart, rangeEnd, sort, from, size);
-        String ip = request.getRemoteAddr();
-        log.info("client ip: {}", ip);
-        String uri = request.getRequestURI();
-        log.info("endpoint path: {}", uri);
-
-        EndpointHitDto endpointHitDto = EndpointHitDto.builder()
-                .app("explore-with-me")
-                .ip(ip)
-                .uri(uri)
-                .timestamp(LocalDateTime.now())
-                .build();
 
         EventParams params = EventParams.builder()
                 .text(text)
@@ -61,7 +51,7 @@ public class PublicEventController {
                 .build();
 
         List<EventShortDto> result = eventService.getShortEvents(params);
-        EndpointHitDto savedEndpointHitDto = statsClient.createEndpointHit(endpointHitDto);
+        sendStats(request);
         return result;
     }
 
@@ -69,21 +59,26 @@ public class PublicEventController {
     public EventFullDto getEvent(@PathVariable(name = "id") Long eventId,
                                  HttpServletRequest request) {
         log.info("GET /{}", eventId);
+
+        EventFullDto result = eventService.getEvent(eventId);
+        sendStats(request);
+        return result;
+    }
+
+    private void sendStats(HttpServletRequest request) {
         String ip = request.getRemoteAddr();
         log.info("client ip: {}", ip);
         String uri = request.getRequestURI();
         log.info("endpoint path: {}", uri);
 
         EndpointHitDto endpointHitDto = EndpointHitDto.builder()
-                        .app("explore-with-me")
-                        .ip(ip)
-                        .uri(uri)
-                        .timestamp(LocalDateTime.now())
-                        .build();
+                .app(APP)
+                .ip(ip)
+                .uri(uri)
+                .timestamp(LocalDateTime.now())
+                .build();
 
-        EventFullDto result = eventService.getEvent(eventId);
-        EndpointHitDto savedEndpointHitDto = statsClient.createEndpointHit(endpointHitDto);
-        return result;
+        statsClient.createEndpointHit(endpointHitDto);
     }
 
 }

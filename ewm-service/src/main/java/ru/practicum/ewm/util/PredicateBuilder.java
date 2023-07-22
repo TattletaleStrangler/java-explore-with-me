@@ -59,5 +59,4 @@ public class PredicateBuilder {
         return ExpressionUtils.anyOf(predicates);
     }
 
-
 }

@@ -1,11 +1,9 @@
 package ru.practicum.ewm.event.dto;
 
 import lombok.experimental.UtilityClass;
-import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.category.model.Category;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.model.Location;
-import ru.practicum.ewm.user.dto.UserShortDto;
 import ru.practicum.ewm.user.model.User;
 
 import java.time.LocalDateTime;
@@ -29,40 +27,38 @@ public class EventMapper {
                 .build();
     }
 
-    public EventFullDto eventToFullDto(Event event, UserShortDto initiator, CategoryDto category,
-                                        LocationDto location, long views, long confirmedRequests) {
+    public EventFullDto eventToFullDto(EventDtoParams params) {
         return EventFullDto.builder()
-                .id(event.getId())
-                .title(event.getTitle())
-                .description(event.getDescription())
-                .annotation(event.getAnnotation())
-                .createdOn(event.getCreatedOn())
-                .eventDate(event.getEventDate())
-                .publishedOn(event.getPublishedOn())
-                .paid(event.getPaid())
-                .requestModeration(event.getRequestModeration())
-                .participantLimit(event.getParticipantLimit())
-                .views(views)
-                .confirmedRequests(confirmedRequests)
-                .initiator(initiator)
-                .category(category)
-                .location(location)
-                .state(event.getState())
+                .id(params.getEvent().getId())
+                .title(params.getEvent().getTitle())
+                .description(params.getEvent().getDescription())
+                .annotation(params.getEvent().getAnnotation())
+                .createdOn(params.getEvent().getCreatedOn())
+                .eventDate(params.getEvent().getEventDate())
+                .publishedOn(params.getEvent().getPublishedOn())
+                .paid(params.getEvent().getPaid())
+                .requestModeration(params.getEvent().getRequestModeration())
+                .participantLimit(params.getEvent().getParticipantLimit())
+                .views(params.getViews())
+                .confirmedRequests(params.getConfirmedRequests())
+                .initiator(params.getInitiator())
+                .category(params.getCategory())
+                .location(params.getLocation())
+                .state(params.getEvent().getState())
                 .build();
     }
 
-    public EventShortDto eventToShortDto(Event event, UserShortDto initiator, CategoryDto category,
-                                         long views, long confirmedRequests) {
+    public EventShortDto eventToShortDto(EventDtoParams params) {
         return EventShortDto.builder()
-                .id(event.getId())
-                .title(event.getTitle())
-                .annotation(event.getAnnotation())
-                .paid(event.getPaid())
-                .confirmedRequests(confirmedRequests)
-                .eventDate(event.getEventDate())
-                .initiator(initiator)
-                .category(category)
-                .views(views)
+                .id(params.getEvent().getId())
+                .title(params.getEvent().getTitle())
+                .annotation(params.getEvent().getAnnotation())
+                .paid(params.getEvent().getPaid())
+                .confirmedRequests(params.getConfirmedRequests())
+                .eventDate(params.getEvent().getEventDate())
+                .initiator(params.getInitiator())
+                .category(params.getCategory())
+                .views(params.getViews())
                 .build();
     }
 
