@@ -21,10 +21,10 @@ public class Compilation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "title")
+    @Column
     private String title;
 
-    @Column(name = "pinned")
+    @Column
     private Boolean pinned;
 
     @ManyToMany(fetch = FetchType.EAGER)

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.http.client.utils.URIBuilder;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.client.StatsClient;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.ewm.category.dto.CategoryDto;
@@ -29,6 +30,7 @@ import static java.util.function.Function.identity;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CompilationService {
 
     private static final String BASE_URI = "/events";
@@ -37,6 +39,7 @@ public class CompilationService {
     private final EventStorage eventStorage;
     private final StatsClient statsClient;
 
+    @Transactional
     public CompilationDto createCompilation(NewCompilationDto compilationDto) {
         if (compilationDto.getPinned() == null) {
             compilationDto.setPinned(false);
@@ -46,6 +49,7 @@ public class CompilationService {
         return compilationToDto(savedCompilation);
     }
 
+    @Transactional
     public CompilationDto updateCompilation(NewCompilationDto compilationDto, Long compId) {
         Compilation oldCompilation = checkCompilationAndGet(compId);
 
@@ -54,6 +58,7 @@ public class CompilationService {
         return compilationToDto(updatedCompilation);
     }
 
+    @Transactional
     public void deleteCompilation(Long compId) {
         compilationStorage.deleteById(compId);
     }
@@ -61,7 +66,6 @@ public class CompilationService {
     public List<CompilationDto> getCompilations(Boolean pinned, int from, int size) {
         PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size);
         List<Compilation> compilations = compilationStorage.findAllByPinned(pinned, page);
-        //todo слить events в один map<event.id, event> и разом их перевести в eventDto, потом по id доставать
         List<CompilationDto> compilationDtoList = compilations.stream()
                 .map(this::compilationToDto)
                 .collect(Collectors.toList());
@@ -70,9 +74,7 @@ public class CompilationService {
 
     public CompilationDto getCompilation(Long compId) {
         Compilation compilation = checkCompilationAndGet(compId);
-
-        CompilationDto compilationDto = compilationToDto(compilation);
-        return compilationDto;
+        return compilationToDto(compilation);
     }
 
     private Compilation newDtoToCompilation(NewCompilationDto dto) {

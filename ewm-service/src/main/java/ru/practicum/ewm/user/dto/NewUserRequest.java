@@ -13,7 +13,6 @@ public class NewUserRequest {
 
     @NotBlank(message = "Field: name. Error: must not be blank.")
     @Size(min = 2, max = 250, message = "Field: name. Error: the length of the username must be at least 2 and no more than 250 characters.")
-    @NotNull(message = "Field: name. Error: must not be blank. Value: null")
     private String name;
 
     @NotBlank(message = "Field: email. Error: must not be blank.")

@@ -35,7 +35,6 @@ public class NewEventDto {
     @NotNull
     private Long category;
 
-    //todo в сообщении вывод текущего значения
     @NotNull
     @EventDateValid(message = "Field: eventDate. Error: должно содержать дату, которая еще не наступила.")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")

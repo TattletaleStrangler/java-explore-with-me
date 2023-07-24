@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.user.dto.NewUserRequest;
 import ru.practicum.ewm.user.dto.UserDto;
 import ru.practicum.ewm.user.model.User;
@@ -14,10 +15,12 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class UserServiceImpl {
 
     private final UserStorage userStorage;
 
+    @Transactional
     public UserDto createUser(NewUserRequest userDto) {
         User user = UserMapper.dtoToUser(userDto);
         User savedUser = userStorage.save(user);
@@ -37,6 +40,7 @@ public class UserServiceImpl {
         return UserMapper.userListToDto(users);
     }
 
+    @Transactional
     public void deleteUser(Long userId) {
         userStorage.deleteById(userId);
     }

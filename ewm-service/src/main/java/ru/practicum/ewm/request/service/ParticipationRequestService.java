@@ -2,6 +2,7 @@ package ru.practicum.ewm.request.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.storage.EventStorage;
 import ru.practicum.ewm.exception.EventNotFountException;
@@ -9,16 +10,15 @@ import ru.practicum.ewm.exception.NotMetConditionsException;
 import ru.practicum.ewm.exception.UserNotFoundException;
 import ru.practicum.ewm.request.dto.ParticipationRequestDto;
 import ru.practicum.ewm.request.model.ParticipationRequest;
-import ru.practicum.ewm.request.model.RequestMapper;
 import ru.practicum.ewm.request.storage.RequestStorage;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.storage.UserStorage;
 
-import javax.transaction.Transactional;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ParticipationRequestService {
 
     private final RequestStorage requestStorage;
@@ -27,13 +27,13 @@ public class ParticipationRequestService {
 
     private final EventStorage eventStorage;
 
-    //**
-    //* нельзя добавить повторный запрос (Ожидается код ошибки 409)
-    //* инициатор события не может добавить запрос на участие в своём событии (Ожидается код ошибки 409)
-    //* нельзя участвовать в неопубликованном событии (Ожидается код ошибки 409)
-    //* если у события достигнут лимит запросов на участие - необходимо вернуть ошибку (Ожидается код ошибки 409)
-    //* если для события отключена пре-модерация запросов на участие, то запрос должен автоматически перейти в состояние подтвержденного
-    //**
+    /**
+    * нельзя добавить повторный запрос (Ожидается код ошибки 409)
+    * инициатор события не может добавить запрос на участие в своём событии (Ожидается код ошибки 409)
+    * нельзя участвовать в неопубликованном событии (Ожидается код ошибки 409)
+    * если у события достигнут лимит запросов на участие - необходимо вернуть ошибку (Ожидается код ошибки 409)
+    * если для события отключена пре-модерация запросов на участие, то запрос должен автоматически перейти в состояние подтвержденного
+    */
     @Transactional
     public ParticipationRequestDto createRequest(Long userId, Long eventId) {
 
@@ -55,7 +55,7 @@ public class ParticipationRequestService {
             throw new NotMetConditionsException("The participant limit has been reached");
         }
 
-        ParticipationRequest participationRequest = RequestMapper.dtoToRequest(requester, event);
+        ParticipationRequest participationRequest = ParticipationRequestDto.RequestMapper.dtoToRequest(requester, event);
 
         if (!event.getRequestModeration() || participantLimit == 0) {
             participationRequest.setStatus(ParticipationRequest.Status.CONFIRMED);
@@ -63,14 +63,15 @@ public class ParticipationRequestService {
 
         ParticipationRequest savedParticipationRequest = requestStorage.save(participationRequest);
 
-        return RequestMapper.requestToDto(savedParticipationRequest);
+        return ParticipationRequestDto.RequestMapper.requestToDto(savedParticipationRequest);
     }
 
     public List<ParticipationRequestDto> getRequests(Long userId) {
         List<ParticipationRequest> participationRequests = requestStorage.findAllByRequesterIdOrderByCreatedDesc(userId);
-        return RequestMapper.requestListToDtoList(participationRequests);
+        return ParticipationRequestDto.RequestMapper.requestListToDtoList(participationRequests);
     }
 
+    @Transactional
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
         checkUserAndGet(userId);
         ParticipationRequest request = checkRequestAndGet(requestId);
@@ -81,7 +82,7 @@ public class ParticipationRequestService {
 
         request.setStatus(ParticipationRequest.Status.CANCELED);
         requestStorage.save(request);
-        return RequestMapper.requestToDto(request);
+        return ParticipationRequestDto.RequestMapper.requestToDto(request);
     }
 
     private User checkUserAndGet(long userId) {

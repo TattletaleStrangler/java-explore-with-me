@@ -5,7 +5,6 @@ import lombok.Setter;
 import ru.practicum.ewm.util.ValidateMarker;
 
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 import java.util.List;
 
@@ -17,7 +16,6 @@ public class NewCompilationDto {
 
     private Boolean pinned;
 
-    @NotNull(groups = ValidateMarker.Create.class, message = "Compilation title cannot be empty.")
     @NotBlank (groups = ValidateMarker.Create.class, message = "Compilation title cannot be blank.")
     @Size(min = 1, max = 50, groups = {ValidateMarker.Create.class, ValidateMarker.Update.class},
             message = "The length of the compilation title cannot be less than 1 and greater than 50.")

@@ -30,8 +30,8 @@ public class AdminUserController {
 
     @GetMapping
     public List<UserDto> getUsers(@RequestParam(name = "ids", required = false) List<Long> ids,
-                               @RequestParam(name = "from", required = false, defaultValue = "0") @PositiveOrZero Integer from,
-                               @RequestParam(name = "size", required = false, defaultValue = "10") @Positive Integer size) {
+                               @RequestParam(defaultValue = "0") @PositiveOrZero Integer from,
+                               @RequestParam(defaultValue = "10") @Positive Integer size) {
         log.info("GET /admin/users?ids={},from={},size={}", ids, from, size);
         return userService.getUsers(ids, from, size);
     }

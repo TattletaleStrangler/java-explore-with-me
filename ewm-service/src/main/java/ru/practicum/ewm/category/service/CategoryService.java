@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.category.dto.CategoryDto;
 import ru.practicum.ewm.category.dto.CategoryMapper;
 import ru.practicum.ewm.category.dto.NewCategoryDto;
@@ -17,17 +18,20 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CategoryService {
 
     private final CategoryStorage categoryStorage;
     private final EventStorage eventStorage;
 
+    @Transactional
     public CategoryDto createCategory(NewCategoryDto categoryDto) {
         Category category = CategoryMapper.dtoToCategory(categoryDto);
         Category savedCategory = categoryStorage.save(category);
         return CategoryMapper.categoryToDto(savedCategory);
     }
 
+    @Transactional
     public CategoryDto updateCategory(NewCategoryDto categoryDto, Long categoryId) {
         Category oldCategory = checkCategoryAndGet(categoryId);
         updateCategory(oldCategory, categoryDto);
@@ -35,6 +39,7 @@ public class CategoryService {
         return CategoryMapper.categoryToDto(newCategory);
     }
 
+    @Transactional
     public void deleteCategory(Long categoryId) {
         checkCategoryAndGet(categoryId);
         checkEmptyCategory(categoryId);

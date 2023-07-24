@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.compilation.dto.CompilationDto;
 import ru.practicum.ewm.compilation.service.CompilationService;
 
+import javax.validation.constraints.Positive;
+import javax.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 @Slf4j
@@ -17,9 +19,9 @@ public class PublicCompilationController {
     private final CompilationService compilationService;
 
     @GetMapping
-    public List<CompilationDto> getCompilations(@RequestParam(required = false, defaultValue = "false") Boolean pinned,
-                                                 @RequestParam(required = false, defaultValue = "0") int from,
-                                                 @RequestParam(required = false, defaultValue = "10") int size) {
+    public List<CompilationDto> getCompilations(@RequestParam(defaultValue = "false") Boolean pinned,
+                                                 @RequestParam(defaultValue = "0") @PositiveOrZero int from,
+                                                 @RequestParam(defaultValue = "10") @Positive int size) {
         log.info("GET /compilations?pinned={},from={},size={}", pinned, from, size);
         return compilationService.getCompilations(pinned, from, size);
     }

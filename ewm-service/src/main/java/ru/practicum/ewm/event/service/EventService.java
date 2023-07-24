@@ -7,6 +7,7 @@ import org.apache.http.client.utils.URIBuilder;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.client.StatsClient;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.ewm.category.dto.CategoryDto;
@@ -29,7 +30,6 @@ import ru.practicum.ewm.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.ewm.request.dto.ParticipationRequestDto;
 import ru.practicum.ewm.request.model.ParticipationRequest;
 import ru.practicum.ewm.request.model.QParticipationRequest;
-import ru.practicum.ewm.request.model.RequestMapper;
 import ru.practicum.ewm.request.storage.RequestStorage;
 import ru.practicum.ewm.user.dto.UserShortDto;
 import ru.practicum.ewm.user.model.User;
@@ -46,6 +46,7 @@ import static java.util.function.Function.identity;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class EventService {
 
     private final EventStorage eventStorage;
@@ -56,9 +57,9 @@ public class EventService {
     private final StatsClient statsClient;
     private static final String BASE_URI = "/events";
 
-    //**
-    //* ADMIN. Получение администратором полных событий
-    //**
+    /**
+     * ADMIN. Получение администратором полных событий
+     */
     public List<EventFullDto> getEvents(EventParams params) {
         checkParams(params);
         List<Event> events = findEvents(params);
@@ -81,12 +82,13 @@ public class EventService {
         return eventFullDtoList;
     }
 
-    //**
-    //* ADMIN. Обновление администратором события (отклонение/публикация)
-    //* дата начала изменяемого события должна быть не ранее чем за час от даты публикации. (Ожидается код ошибки 409)
-    //* событие можно публиковать, только если оно в состоянии ожидания публикации (Ожидается код ошибки 409)
-    //* событие можно отклонить, только если оно еще не опубликовано (Ожидается код ошибки 409)
-    //**
+    /**
+    * ADMIN. Обновление администратором события (отклонение/публикация)
+    * дата начала изменяемого события должна быть не ранее чем за час от даты публикации. (Ожидается код ошибки 409)
+    * событие можно публиковать, только если оно в состоянии ожидания публикации (Ожидается код ошибки 409)
+    * событие можно отклонить, только если оно еще не опубликовано (Ожидается код ошибки 409)
+    */
+    @Transactional
     public EventFullDto updateEvent(UpdateEventAdminRequest eventDto, Long eventId) {
         Event oldEvent = checkEventAndGet(eventId);
 
@@ -118,16 +120,15 @@ public class EventService {
         EventDtoParams eventDtoParams = createEventDtoParams(newEvent, views, confirmedRequests);
         return EventMapper.eventToFullDto(eventDtoParams);
     }
-//----------------------------------------------------------------------------------------------------------------------
 
-    //**
-    //* PUBLIC. Получение любым пользователем коротких событий
-    //* это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события
-    //* текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв
-    //* если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени
-    //* информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие
-    //* информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики
-    //**
+    /**
+    * PUBLIC. Получение любым пользователем коротких событий
+    * это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события
+    * текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв
+    * если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени
+    * информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие
+    * информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики
+    */
     public List<EventShortDto> getShortEvents(EventParams params) {
         checkParams(params);
         List<Event> events = findEvents(params);
@@ -150,12 +151,12 @@ public class EventService {
         return eventShortDtoList;
     }
 
-    //**
-    //* PUBLIC. Получение любым пользователем полного события
-    //* событие должно быть опубликовано
-    //* информация о событии должна включать в себя количество просмотров и количество подтвержденных запросов
-    //* информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики
-    //**
+    /**
+    * PUBLIC. Получение любым пользователем полного события
+    * событие должно быть опубликовано
+    * информация о событии должна включать в себя количество просмотров и количество подтвержденных запросов
+    * информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики
+    */
     public EventFullDto getEvent(Long eventId) {
         Event event = checkEventAndGet(eventId);
         if (!event.getState().equals(Event.State.PUBLISHED)) {
@@ -168,11 +169,11 @@ public class EventService {
         EventDtoParams eventDtoParams = createEventDtoParams(event, views, confirmedRequests);
         return EventMapper.eventToFullDto(eventDtoParams);
     }
-//----------------------------------------------------------------------------------------------------------------------
 
-    //**
-    //* PRIVATE. Создание зарегистрированным пользователем события
-    //**
+    /**
+    * PRIVATE. Создание зарегистрированным пользователем события
+    */
+    @Transactional
     public EventFullDto createEvent(NewEventDto eventDto, Long userId) {
         User initiator = checkUserAndGet(userId);
         Category category = checkCategoryAndGet(eventDto.getCategory());
@@ -183,15 +184,13 @@ public class EventService {
         event.setState(Event.State.PENDING);
         Event savedEvent = eventStorage.save(event);
 
-        long initConfirmedRequests = 0L;
-        long initViews = 0L;
-        EventDtoParams eventDtoParams = createEventDtoParams(savedEvent, initViews, initConfirmedRequests);
+        EventDtoParams eventDtoParams = createEventDtoParams(savedEvent, 0, 0);
         return EventMapper.eventToFullDto(eventDtoParams);
     }
 
-    //**
-    //* PRIVATE. Получение зарегистрированным пользователем своих коротких событий
-    //**
+    /**
+    * PRIVATE. Получение зарегистрированным пользователем своих коротких событий
+    */
     public List<EventShortDto> getEvents(Long userId, int from, int size) {
         User initiator = checkUserAndGet(userId);
         UserMapper.userToShortDto(initiator);
@@ -216,9 +215,9 @@ public class EventService {
         return eventShortDtoList;
     }
 
-    //**
-    //* PRIVATE. Получение зарегистрированным пользователем своего полного события
-    //**
+    /**
+    * PRIVATE. Получение зарегистрированным пользователем своего полного события
+    */
     public EventFullDto getEvent(Long userId, Long eventId) {
         User initiator = checkUserAndGet(userId);
         UserMapper.userToShortDto(initiator);
@@ -231,11 +230,12 @@ public class EventService {
         return EventMapper.eventToFullDto(eventDtoParams);
     }
 
-    //**
-    //* PRIVATE. Обновление зарегистрированным пользователем своего события
-    //* изменить можно только отмененные события или события в состоянии ожидания модерации (Ожидается код ошибки 409)
-    //* дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента (Ожидается код ошибки 409)
-    //**
+    /**
+    * PRIVATE. Обновление зарегистрированным пользователем своего события
+    * изменить можно только отмененные события или события в состоянии ожидания модерации (Ожидается код ошибки 409)
+    * дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента (Ожидается код ошибки 409)
+    */
+    @Transactional
     public EventFullDto updateEvent(UpdateEventUserRequest eventDto, Long userId, Long eventId) {
         User initiator = checkUserAndGet(userId);
         UserMapper.userToShortDto(initiator);
@@ -266,9 +266,9 @@ public class EventService {
         return eventFullDto;
     }
 
-    //**
-    //* PRIVATE. Получение информации о запросах на участие в событии текущего пользователя
-    //**
+    /**
+    * PRIVATE. Получение информации о запросах на участие в событии текущего пользователя
+    */
     public List<ParticipationRequestDto> getRequestsForEvent(Long userId, Long eventId) {
         User user = checkUserAndGet(userId);
         Event event = checkEventAndGet(eventId);
@@ -278,16 +278,17 @@ public class EventService {
         }
 
         List<ParticipationRequest> requests = requestStorage.findAllByEventId(event.getId());
-        return RequestMapper.requestListToDtoList(requests);
+        return ParticipationRequestDto.RequestMapper.requestListToDtoList(requests);
     }
 
-    //**
-    //* PRIVATE. Подтверждение зарегистрированным пользователем заявок на своё событие
-    //* если для события лимит заявок равен 0 или отключена пре-модерация заявок, то подтверждение заявок не требуется
-    //* нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие (Ожидается код ошибки 409)
-    //* статус можно изменить только у заявок, находящихся в состоянии ожидания (Ожидается код ошибки 409)
-    //* если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить
-    //**
+    /**
+    * PRIVATE. Подтверждение зарегистрированным пользователем заявок на своё событие
+    * если для события лимит заявок равен 0 или отключена пре-модерация заявок, то подтверждение заявок не требуется
+    * нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие (Ожидается код ошибки 409)
+    * статус можно изменить только у заявок, находящихся в состоянии ожидания (Ожидается код ошибки 409)
+    * если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить
+    */
+    @Transactional
     public EventRequestStatusUpdateResult confirmRequest(EventRequestStatusUpdateRequest eventRequestStatusUpdateRequest,
                                                          Long userId, Long eventId) {
         User user = checkUserAndGet(userId);
@@ -328,8 +329,8 @@ public class EventService {
         requestStorage.saveAll(requests);
 
         return EventRequestStatusUpdateResult.builder()
-                .confirmedRequests(RequestMapper.requestListToDtoList(confirmedRequests))
-                .rejectedRequests(RequestMapper.requestListToDtoList(rejectedRequests))
+                .confirmedRequests(ParticipationRequestDto.RequestMapper.requestListToDtoList(confirmedRequests))
+                .rejectedRequests(ParticipationRequestDto.RequestMapper.requestListToDtoList(rejectedRequests))
                 .build();
     }
 

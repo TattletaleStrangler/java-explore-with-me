@@ -11,6 +11,8 @@ import ru.practicum.ewm.event.dto.EventShortDto;
 import ru.practicum.ewm.event.service.EventService;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.constraints.Positive;
+import javax.validation.constraints.PositiveOrZero;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -31,9 +33,9 @@ public class PublicEventController {
                                          @RequestParam(required = false) List<Long> categories,
                                          @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeStart,
                                          @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime rangeEnd,
-                                         @RequestParam(required = false, defaultValue = "EVENT_DATE") String sort,
-                                         @RequestParam(required = false, defaultValue = "0") int from,
-                                         @RequestParam(required = false, defaultValue = "10") int size,
+                                         @RequestParam(defaultValue = "EVENT_DATE") String sort,
+                                         @RequestParam(defaultValue = "0") @PositiveOrZero int from,
+                                         @RequestParam(defaultValue = "10") @Positive int size,
                                          HttpServletRequest request) {
         log.info("GET /events text={},paid={},onlyAvailable={},categories={},rangeStart={},rangeEnd={},sort={},from={},size={}",
                 text, paid, onlyAvailable, categories, rangeStart, rangeEnd, sort, from, size);
