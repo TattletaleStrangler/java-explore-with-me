@@ -66,10 +66,7 @@ public class CompilationService {
     public List<CompilationDto> getCompilations(Boolean pinned, int from, int size) {
         PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size);
         List<Compilation> compilations = compilationStorage.findAllByPinned(pinned, page);
-        List<CompilationDto> compilationDtoList = compilations.stream()
-                .map(this::compilationToDto)
-                .collect(Collectors.toList());
-        return compilationDtoList;
+        return compilationListToDto(compilations);
     }
 
     public CompilationDto getCompilation(Long compId) {
@@ -114,29 +111,52 @@ public class CompilationService {
 
     }
 
-    private CompilationDto compilationToDto(Compilation compilation) {
-        List<EventShortDto> eventShortDtoList = new ArrayList<>();
+    private List<CompilationDto> compilationListToDto(List<Compilation> compilations) {
+        List<CompilationDto> compilationDtoList = new ArrayList<>();
 
+        Set<Event> events = new HashSet<>();
+        compilations.forEach((c) -> events.addAll(c.getEvents()));
+        List<Event> eventList = new ArrayList<>(events);
+
+        Map<Long, ConfirmedRequests> groupedConfirmedRequests = getConfirmedRequests(eventList);
+        Map<Long, String> uris = new HashMap<>();
+        Map<String, ViewStatsDto> sortViews = getStatistics(eventList, uris, false);
+
+        for (Compilation compilation : compilations) {
+            List<EventShortDto> eventShortDtoList = eventListToShortDtoList(compilation.getEvents(), uris, sortViews, groupedConfirmedRequests);
+
+            compilationDtoList.add(CompilationDto.builder()
+                    .id(compilation.getId())
+                    .title(compilation.getTitle())
+                    .pinned(compilation.getPinned())
+                    .events(eventShortDtoList)
+                    .build());
+        }
+        return compilationDtoList;
+    }
+
+    private CompilationDto compilationToDto(Compilation compilation) {
         Set<Event> events = compilation.getEvents();
         List<Event> eventList = new ArrayList<>(events);
-        List<ConfirmedRequests> confirmedRequests = requestStorage.getRequestsByEventAndStatus(eventList, ParticipationRequest.Status.CONFIRMED);
-        Map<Long, ConfirmedRequests> groupedConfirmedRequests = confirmedRequests.stream()
-                .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
 
+        Map<Long, ConfirmedRequests> groupedConfirmedRequests = getConfirmedRequests(eventList);
         Map<Long, String> uris = new HashMap<>();
+        Map<String, ViewStatsDto> sortViews = getStatistics(eventList, uris, false);
 
-        for (Event event : events) {
-            URIBuilder uriBuilder = new URIBuilder()
-                    .setPath(BASE_URI)
-                    .setPath(String.valueOf(event.getId()));
-            uris.put(event.getId(), uriBuilder.toString());
-        }
+        List<EventShortDto> eventShortDtoList = eventListToShortDtoList(events, uris, sortViews, groupedConfirmedRequests);
 
-        List<ViewStatsDto> viewStats = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
-                false, new ArrayList<>(uris.values()));
+        return CompilationDto.builder()
+                .id(compilation.getId())
+                .title(compilation.getTitle())
+                .pinned(compilation.getPinned())
+                .events(eventShortDtoList)
+                .build();
+    }
 
-        Map<String, ViewStatsDto> sortViews = viewStats.stream()
-                .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
+    private List<EventShortDto> eventListToShortDtoList(Set<Event> events, Map<Long, String> uris, Map<String,
+            ViewStatsDto> sortViews, Map<Long, ConfirmedRequests> groupedConfirmedRequests) {
+        List<EventShortDto> eventShortDtoList = new ArrayList<>();
+
         for (Event event : events) {
             ViewStatsDto viewStatsDto = sortViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
             ConfirmedRequests confirmedRequestsForEvent = groupedConfirmedRequests.get(event.getId());
@@ -146,12 +166,28 @@ public class CompilationService {
             eventShortDtoList.add(dto);
         }
 
-        return CompilationDto.builder()
-                .id(compilation.getId())
-                .title(compilation.getTitle())
-                .pinned(compilation.getPinned())
-                .events(eventShortDtoList)
-                .build();
+        return eventShortDtoList;
+    }
+
+    private Map<Long, ConfirmedRequests> getConfirmedRequests(List<Event> events) {
+        List<ConfirmedRequests> confirmedRequests = requestStorage.getRequestsByEventAndStatus(events, ParticipationRequest.Status.CONFIRMED);
+        return confirmedRequests.stream()
+                .collect(Collectors.toMap(ConfirmedRequests::getEventId, identity(), (existing, replacement) -> existing));
+    }
+
+    private Map<String, ViewStatsDto> getStatistics(List<Event> events, Map<Long, String> uris, Boolean unique) {
+        for (Event event : events) {
+            URIBuilder uriBuilder = new URIBuilder()
+                    .setPath(BASE_URI)
+                    .setPath(String.valueOf(event.getId()));
+            uris.put(event.getId(), uriBuilder.toString());
+        }
+
+        List<ViewStatsDto> viewStats = statsClient.getStatistics(LocalDateTime.now().minusMonths(1), LocalDateTime.now(),
+                unique, new ArrayList<>(uris.values()));
+
+        return viewStats.stream()
+                .collect(Collectors.toMap(ViewStatsDto::getUri, identity(), (existing, replacement) -> existing));
     }
 
     private EventDtoParams createEventDtoParams(Event event, long hits, long confirmedRequests) {
