@@ -22,6 +22,7 @@
 							"        const user2 = await api.addUser(rnd.getUser());\r",
 							"        pm.collectionVariables.set(\"uid1\", user1.id);\r",
 							"        pm.collectionVariables.set(\"uid2\", user2.id);\r",
+							"        pm.collectionVariables.set(\"source\", user2);\r",
 							"    } catch(err) {\r",
 							"        console.error(\"Ошибка при подготовке тестовых данных.\", err);\r",
 							"    }\r",
@@ -56,7 +57,7 @@
 							"});\r",
 							"\r",
 							"const target = pm.response.json();\r",
-							"const source = pm.collectionVariables.get('uid2');\r",
+							"const source = pm.collectionVariables.get('source');\r",
 							"\r",
 							"pm.test(\"Ответ должен содержать поля: id, name, email, subscriptions\", function () {\r",
 							"pm.expect(target).to.have.property('id');\r",
@@ -69,7 +70,7 @@
 							"    pm.expect(target.id).to.not.be.null;\r",
 							"    pm.expect(target.subscriptions).is.an('array');\r",
 							"    pm.expect(target.subscriptions.length).equal(1);\r",
-							"    pm.expect(target.subscriptions[0]).equal(source);\r",
+							"    pm.expect(target.subscriptions[0]).to.eql(source.id);\r",
 							"});"
 						],
 						"type": "text/javascript"
@@ -2153,6 +2154,11 @@
 		{
 			"key": "baseUrl",
 			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "source",
+			"value": "",
 			"type": "string"
 		}
 	]
