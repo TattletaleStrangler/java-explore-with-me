@@ -32,7 +32,7 @@ public class PrivateUserController {
     @DeleteMapping("/{subscriberId}/{eventMakerId}")
     @ResponseStatus(code = HttpStatus.NO_CONTENT)
     public void unfollowUser(@PathVariable Long subscriberId,
-                                @PathVariable Long eventMakerId) {
+                             @PathVariable Long eventMakerId) {
         log.info("DELETE /users/{}/{}", subscriberId, eventMakerId);
         userService.unfollowUser(subscriberId, eventMakerId);
     }

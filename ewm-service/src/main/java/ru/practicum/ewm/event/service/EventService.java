@@ -438,7 +438,7 @@ public class EventService {
                                                 .from(request)
                                                 .where(request.event.id.eq(event.id))
                                 )))
-                .add(params.getPaid(), event.paid.isTrue())
+                .add(params.getPaid(), event.paid::eq)
                 .add(params.getUsers(), event.initiator.id::in)
                 .add(params.getStates(), event.state::in)
                 .add(params.getCategories(), event.category.id::in)
