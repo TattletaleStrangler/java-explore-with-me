@@ -77,5 +77,13 @@ CREATE TABLE IF NOT EXISTS compilation_list (
 	CONSTRAINT uq_compilation UNIQUE (compilation_id, event_id)
 );
 
+CREATE TABLE IF NOT EXISTS subscriptions (
+    user_id BIGINT NOT NULL,
+    event_maker BIGINT NOT NULL,
+    FOREIGN KEY (user_id)  REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (event_maker)  REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT uq_subscriptions UNIQUE (user_id, event_maker)
+);
+
 
 

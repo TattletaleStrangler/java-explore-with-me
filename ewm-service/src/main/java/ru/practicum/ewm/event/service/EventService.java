@@ -334,6 +334,44 @@ public class EventService {
                 .build();
     }
 
+    /**
+     * PRIVATE. получение событий пользователей, на которых подписан
+     */
+    public List<EventShortDto> getSubscriptions(long userId, EventParams params) {
+        User user = checkUserAndGet(userId);
+        Set<User> subscriptions = user.getSubscriptions();
+
+        List<Long> users = params.getUsers();
+        if (users != null && users.size() > 0) {
+            HashSet<Long> subscriptionsIds = new HashSet<>();
+            subscriptions.stream().map(User::getId).forEach(subscriptionsIds::add);
+
+            if (!subscriptionsIds.containsAll(users)) {
+                throw new ValidationException("Some users are not among the subscriptions");
+            }
+
+        } else {
+            List<Long> usersIds = subscriptions.stream().map(User::getId).collect(Collectors.toList());
+            params.setUsers(usersIds);
+        }
+
+        List<Event> events = findEvents(params);
+        Map<Long, ConfirmedRequests> groupedConfirmedRequests = getConfirmedRequests(events);
+        Map<Long, String> uris = new HashMap<>();
+        Map<String, ViewStatsDto> groupedViews = getStatistics(events, uris, true);
+
+        List<EventShortDto> eventShortDtoList = new ArrayList<>();
+        for (Event event : events) {
+            ViewStatsDto viewStatsDto = groupedViews.getOrDefault(uris.get(event.getId()), new ViewStatsDto(null, null, 0L));
+            ConfirmedRequests confirmedRequestsForEvent = groupedConfirmedRequests.get(event.getId());
+            long numConfirmedRequests = confirmedRequestsForEvent == null ? 0 : confirmedRequestsForEvent.getConfirmedRequests();
+            EventDtoParams eventDtoParams = createEventDtoParams(event, viewStatsDto.getHits(), numConfirmedRequests);
+            EventShortDto dto = EventMapper.eventToShortDto(eventDtoParams);
+            eventShortDtoList.add(dto);
+        }
+        return eventShortDtoList;
+    }
+
     private EventDtoParams createEventDtoParams(Event event, long views, long confirmedRequests) {
         UserShortDto initiatorDto = UserMapper.userToShortDto(event.getInitiator());
         CategoryDto categoryDto = CategoryMapper.categoryToDto(event.getCategory());
@@ -400,7 +438,7 @@ public class EventService {
                                                 .from(request)
                                                 .where(request.event.id.eq(event.id))
                                 )))
-                .add(params.getPaid(), event.paid.isTrue())
+                .add(params.getPaid(), event.paid::eq)
                 .add(params.getUsers(), event.initiator.id::in)
                 .add(params.getStates(), event.state::in)
                 .add(params.getCategories(), event.category.id::in)
@@ -411,7 +449,7 @@ public class EventService {
 
     private User checkUserAndGet(long userId) {
         return userStorage.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("Category with id=" + userId + " was not found"));
+                .orElseThrow(() -> new UserNotFoundException("User with id=" + userId + " was not found"));
     }
 
     private Category checkCategoryAndGet(long categoryId) {
@@ -421,7 +459,7 @@ public class EventService {
 
     private Event checkEventAndGet(long eventId) {
         return eventStorage.findById(eventId)
-                .orElseThrow(() -> new EventNotFountException("Category with id=" + eventId + " was not found"));
+                .orElseThrow(() -> new EventNotFountException("Event with id=" + eventId + " was not found"));
     }
 
     private void updateEvent(Event event, UpdateEventRequest newDto) {
